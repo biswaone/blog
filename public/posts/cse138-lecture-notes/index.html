@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en-us"><head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+   <meta name="description" content="
+
+CSE138 (Distributed Systems) L3: partial orders, total orders, Lamport clocks, vector clocks
+
+
+Happens Before:
+  
+  	
+  	Figure: Happens Before relationship
+  
+
+if A and B are 2 events in the same process and A happens before B then A -&gt; B
+if A is a send and B is a corresponding receive then A -&gt; B
+if A -&gt; B and C -&gt; B then A -&gt; B (transitive)
+
+How are A and E related: A -&gt; B and B -&gt; E so A -&gt; E
+How are D and A related: Not related
+
+What all places we can go from A ?
+
+we can go to B,E,F,G but not D
+we say that A and D are concurrent
+
+
+
+
+
+
+
+Partial Order/Partially Ordered Set:
+
+A set S, together with a binary relation often written as $a \leq b$ (a is related to b this can be the happens before relationship) that lets us compare things in set S and has the following properties
+
+Reflexivity: $ x \in A, \ a \leq a $
+Anti-symmetry: for all $a, b \in A$ if $a \leq b$ and $b \leq a$  then $a = b$
+Transitivity: $a,b,c \in S$ if $a \leq b$ and $b \leq c$ then $a \leq c$
+
+
+We have 8 events ${A, B, C, D, E, F, G, H}$
+We are checking that whether happens before is actually a partial order
+
+Transitivity is satisfied
+Anti symmetry is vacuously true
+Reflexivity is untrue as $a \leq a$ a happens before a is untrue or doesn&rsquo;t make sense
+
+
+The above shows that happens before is not a partial order or can be said irreflexive partial order
+Example of partial order
+
+set containment
+the subsets of set of ${a,b,c}$ is a partial order
+${∅,{a},{b},{c},{a,b},{a,c},{b,c},{a,b,c}}$
+
+${a} \leq {a}$  An element is a subset of itself
+${a,b} \leq  {a,b}$ and ${a,b} \geq  {a,b}$
+${a} \subseteq {a,b}$ and ${a,b} \subseteq {a,b,c}$ then ${a} \subseteq {a,c}$
+
+
+
+
+Elements that are not comparable, for those happens before relation says they are concurrent, those are the elements not ordered by partial order
+In total order every pair of event is ordered
+
+
+
+Clocks
+
+Physical Clocks
+
+Time of day clocks
+monotonic clocks
+
+
+Logical Clocks: Ordering of events
+
+Lamport clocks
+
+Assigning number to events
+Denoted as LC(A): Lamport clock of event A
+clock condition: if $a \to b$  then $LC(A) \leq LC(B)$
+Lamport clocks are consistent with causality
+
+
+Lamport clock algorithm
+
+Every process has to keep a counter initialized to 0
+On every event on a process that counter has to increment by 1
+When you send a message, a process needs to include its current counter in the message
+When receiving a message, a process sets its counter to the max(local-counter, received-counter) &#43; 1
+
+
+
+if $a \to b$  then $LC(A) \leq LC(B)$ but the reverse is not true
+
+Lamport clocks are consistent with (potential) causality
+
+A -&gt; B then logical clock of A &lt; Logical clock of B
+characterizes causality
+
+if LC(A) &lt; LC(B) then A -&gt; B Lamport clocks do not have this property
+
+
+
+
+What something we can do with Lamport clocks ?
+
+what can we do with P -&gt; Q
+we can take its contrapositive
+if P implies Q then
+
+not Q implies not P or $\neg Q \Rightarrow \neg P$
+$A \rightarrow B \ \Rightarrow \quad LC(A) &lt; LC(B)$
+$\neg \ (LC(A) &lt; LC(B)) \Rightarrow \neg \ (A \to B)$
+We can rule out the possibility that A happens before B
+It might be the case that $ B \rightarrow A \ or \ A \parallel B $
+
+
+Lamport clocks can help in ruling out things
+
+
+
+
+
+Vector Clocks
+
+$A \rightarrow B \ \Rightarrow  LC(A) &lt; LC(B)$  (Lamport clocks)
+LC are &ldquo;consistent with causality&rdquo;
+The other direction (&ldquo;characterizes causality&rdquo;) doesn&rsquo;t hold
+Clocks that is consistent with causality and characterizes causality
+$A \rightarrow B \ \Leftrightarrow LC(A) &lt; LC(B)$
+
+Every process keeps a vector (length N for N processes) of integers initialized to 0 $[0,0,0]$
+On every event, a process increments its own vector clock(all events: sends, receive and internal events)
+when sending a message, a process includes its current vector clock (after the increment from step 2, because sends are events)
+when receiving a message, a process will update its vector clock to the maximum(local,received). local is its own vector clock after incrementing its position, because receives are events
+
+
+Max of vectors
+
+$[1,12,4]$ and $[7,0,2]$ will be $[7,12,4]$  (pointwise maximum)
+
+
+Suppose we have a vector clock of $[5,0,0]$ for alice, bob and carol this means alice has seen 5 events whereas bob and carol haven&rsquo;t seen any
+
+
+
+
+
+
+
+CSE138 (Distributed Systems) L4: vector clocks, FIFO/causal/totally-ordered delivery
+
+
+All the elements in the red circle constitute the causal history of A
+Their vector clocks are smaller than A (the value of elements are smaller in every position)
+The events in the blue circle are the events that are concurrent or causally independent with A
+
+
+
+Protocols
+
+A set of rules that processes use to communicate with each other
+
+correctness property of execution
+
+FIFO Delivery: if a process sends message m2 after m1, any process delivering both delivers m1 first and then m2
+
+sending a message is something you do
+Receiving a message is something that happens to you
+Delivering a message is something you can do with a message you receive (you queue up a received messages and wait to deliver them)
+Violation of FIFO delivery
+
+What can we do to implement FIFO delivery
+
+Sequence numbers: Tag your messages with sender id and sender sequence number
+senders increment there sequence number after sending the message
+if a received message sequence number is the SN of the prev message from that sender &#43; 1, deliver that message
+
+
+What will happen if a message doesn&rsquo;t gets delivered
+
+
+using sequence numbers only works well if you have reliable delivery
+TCP has reliable delivery
+
+suppose we don&rsquo;t have reliable delivery
+
+
+
+Vacuously satisfies FIFO delivery
+After every message receive bob can send ack, this also guarantees FIFO delivery but is also slow and ack could also get lost
+
+
+
+
+
+
+
+
+
+
+Causal Delivery
+
+if m1 send happened before m2 send then m1&rsquo;s delivery must happen before m2&rsquo;s delivery
+
+How to enforce causal delivery? (Hint: Using vector clocks)
+Correctness property of execution
+
+FIFO delivery
+causal delivery
+Totally ordered delivery
+
+
+
+
+
+Totally Ordered Delivery
+
+if a process delivers m1 and then m2, then all processes delivering both m1 and m2 deliver m1 first and then m2
+
+
+
+">  
+
+  <title>
+    
+      CSE138: Notes
+    
+  </title>
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/" />
+  
+  
+  
+  <link rel="stylesheet" href="/css/main.900100e9dbee2d56c58fac8bb717037cae7e26a9c36c29d2ff587bdd65f0cbbe510b41d81a3bb234919cdfdc7550d786b2fab70c8fc507772d732fe097106d12.css" integrity="sha512-kAEA6dvuLVbFj6yLtxcDfK5&#43;JqnDbCnS/1h73WXwy75RC0HYGjuyNJGc39x1UNeGsvq3DI/FB3ctcy/glxBtEg==" />
+   <script>
+  MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$','$$'], ['\\[', '\\]']],
+      processEscapes: true,
+      processEnvironments: true
+    },
+    options: {
+      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+    }
+  };
+
+  window.addEventListener('load', (event) => {
+      document.querySelectorAll("mjx-container").forEach(function(x){
+        x.parentElement.classList += 'has-jax'})
+    });
+
+</script>
+<script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+ 
+</head>
+<body a="auto">
+        <main class="page-content" aria-label="Content">
+            <div class="w">
+                <div class="post-meta">
+                    <a href="/">..</a>
+
+                    <p>
+                        <time datetime="2023-10-03 13:57:56 &#43;0530 IST">
+                            2023-10-03
+                        </time>
+                    </p>
+                </div>
+
+<article>
+    <h1>CSE138: Notes</h1>
+
+    
+
+    <ul>
+<li>
+<h3 id="cse138-distributed-systems-l3-partial-orders-total-orders-lamport-clocks-vector-clocks"><a href="https://www.youtube.com/watch?v=UqY1tF3zxjc&amp;list=PLNPUF5QyWU8PydLG2cIJrCvnn5I_exhYx&amp;index=3">CSE138 (Distributed Systems) L3: partial orders, total orders, Lamport clocks, vector clocks</a></h3>
+<ul>
+<li>
+<p><strong>Happens Before:</strong></p>
+  <figure style="text-align: center;">
+  	<img src="Happens%20Before%20relationship.png" alt="Descriptive Alt Text" style="width: 700px;">
+  	<figcaption style="color: #ccc; font-style: italic; font-size: 0.9em;"><em>Figure: Happens Before relationship</em></figcaption>
+  </figure>
+<ul>
+<li>if A and B are 2 events in the same process and A happens before B then A -&gt; B</li>
+<li>if A is a send and B is a corresponding receive then A -&gt; B</li>
+<li>if A -&gt; B and C -&gt; B then A -&gt; B (transitive)</li>
+<li><img src="Pasted%20image%2020231014132913.png" alt="Desktop View"></li>
+<li>How are A and E related: A -&gt; B and B -&gt; E so A -&gt; E</li>
+<li>How are D and A related: Not related
+<ul>
+<li>What all places we can go from A ?
+<ul>
+<li>we can go to B,E,F,G but not D</li>
+<li>we say that A and D are concurrent</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h4 id="partial-orderpartially-ordered-set">Partial Order/Partially Ordered Set:</h4>
+<ul>
+<li>A set S, together with a binary relation often written as $a \leq b$ (a is related to b this can be the happens before relationship) that lets us compare things in set S and has the following properties
+<ul>
+<li>Reflexivity: $ x \in A, \ a \leq a $</li>
+<li>Anti-symmetry: for all $a, b \in A$ if $a \leq b$ and $b \leq a$  then $a = b$</li>
+<li>Transitivity: $a,b,c \in S$ if $a \leq b$ and $b \leq c$ then $a \leq c$</li>
+</ul>
+</li>
+<li>We have 8 events ${A, B, C, D, E, F, G, H}$</li>
+<li>We are checking that whether happens before is actually a partial order
+<ul>
+<li>Transitivity is satisfied</li>
+<li>Anti symmetry is vacuously true</li>
+<li>Reflexivity is untrue as $a \leq a$ a happens before a is untrue or doesn&rsquo;t make sense</li>
+</ul>
+</li>
+<li>The above shows that happens before is not a partial order or can be said irreflexive partial order</li>
+<li>Example of partial order
+<ul>
+<li>set containment</li>
+<li>the subsets of set of ${a,b,c}$ is a partial order</li>
+<li>${∅,{a},{b},{c},{a,b},{a,c},{b,c},{a,b,c}}$
+<ul>
+<li>${a} \leq {a}$  An element is a subset of itself</li>
+<li>${a,b} \leq  {a,b}$ and ${a,b} \geq  {a,b}$</li>
+<li>${a} \subseteq {a,b}$ and ${a,b} \subseteq {a,b,c}$ then ${a} \subseteq {a,c}$</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Elements that are not comparable, for those happens before relation says they are concurrent, those are the elements not ordered by partial order</li>
+<li>In total order every pair of event is ordered</li>
+</ul>
+</li>
+<li>
+<h3 id="clocks">Clocks</h3>
+<ul>
+<li>Physical Clocks
+<ul>
+<li>Time of day clocks</li>
+<li>monotonic clocks</li>
+</ul>
+</li>
+<li>Logical Clocks: Ordering of events
+<ul>
+<li>Lamport clocks
+<ul>
+<li>Assigning number to events</li>
+<li>Denoted as LC(A): Lamport clock of event A</li>
+<li>clock condition: if $a \to b$  then $LC(A) \leq LC(B)$</li>
+<li><strong>Lamport clocks are consistent with causality</strong></li>
+</ul>
+</li>
+<li>Lamport clock algorithm
+<ul>
+<li>Every process has to keep a counter initialized to 0</li>
+<li>On every event on a process that counter has to increment by 1</li>
+<li>When you send a message, a process needs to include its current counter in the message</li>
+<li>When receiving a message, a process sets its counter to the max(local-counter, received-counter) + 1</li>
+</ul>
+</li>
+<li><img src="Pasted%20image%2020231014185622.png" alt="Desktop View"></li>
+<li>if $a \to b$  then $LC(A) \leq LC(B)$ but the reverse is not true</li>
+<li><img src="Pasted%20image%2020231014191504.png" alt="Desktop View"></li>
+<li>Lamport clocks are consistent with (potential) causality
+<ul>
+<li>A -&gt; B then logical clock of A &lt; Logical clock of B</li>
+<li>characterizes causality
+<ul>
+<li>if LC(A) &lt; LC(B) then A -&gt; B Lamport clocks do not have this property</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>What something we can do with Lamport clocks ?
+<ul>
+<li>what can we do with P -&gt; Q</li>
+<li>we can take its contrapositive</li>
+<li>if P implies Q then
+<ul>
+<li>not Q implies not P or $\neg Q \Rightarrow \neg P$</li>
+<li>$A \rightarrow B \ \Rightarrow \quad LC(A) &lt; LC(B)$</li>
+<li>$\neg \ (LC(A) &lt; LC(B)) \Rightarrow \neg \ (A \to B)$</li>
+<li>We can rule out the possibility that A happens before B</li>
+<li>It might be the case that $ B \rightarrow A \ or \ A \parallel B $</li>
+</ul>
+</li>
+<li>Lamport clocks can help in ruling out things</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h4 id="vector-clocks">Vector Clocks</h4>
+<ul>
+<li>$A \rightarrow B \ \Rightarrow  LC(A) &lt; LC(B)$  (Lamport clocks)</li>
+<li>LC are &ldquo;consistent with causality&rdquo;</li>
+<li>The other direction (&ldquo;characterizes causality&rdquo;) doesn&rsquo;t hold</li>
+<li>Clocks that is consistent with causality and characterizes causality</li>
+<li>$A \rightarrow B \ \Leftrightarrow LC(A) &lt; LC(B)$
+<ol>
+<li>Every process keeps a vector (length N for N processes) of integers initialized to 0 $[0,0,0]$</li>
+<li>On every event, a process increments its own vector clock(all events: sends, receive and internal events)</li>
+<li>when sending a message, a process includes its current vector clock (after the increment from step 2, because sends are events)</li>
+<li>when receiving a message, a process will update its vector clock to the maximum(local,received). local is its own vector clock after incrementing its position, because receives are events</li>
+</ol>
+</li>
+<li>Max of vectors
+<ul>
+<li>$[1,12,4]$ and $[7,0,2]$ will be $[7,12,4]$  (pointwise maximum)</li>
+</ul>
+</li>
+<li>Suppose we have a vector clock of $[5,0,0]$ for alice, bob and carol this means alice has seen 5 events whereas bob and carol haven&rsquo;t seen any</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h3 id="cse138-distributed-systems-l4-vector-clocks-fifocausaltotally-ordered-delivery"><a href="https://www.youtube.com/watch?v=5BHizc7BPyE">CSE138 (Distributed Systems) L4: vector clocks, FIFO/causal/totally-ordered delivery</a></h3>
+<ul>
+<li><img src="20231015131523.png" alt="Desktop View"></li>
+<li>All the elements in the red circle constitute the causal history of A</li>
+<li>Their vector clocks are smaller than A (the value of elements are smaller in every position)</li>
+<li>The events in the blue circle are the events that are concurrent or causally independent with A</li>
+</ul>
+</li>
+<li>
+<h3 id="protocols">Protocols</h3>
+<ul>
+<li>A set of rules that processes use to communicate with each other</li>
+<li>
+<h4 id="correctness-property-of-execution">correctness property of execution</h4>
+<ul>
+<li>FIFO Delivery: if a process sends message m2 after m1, any process delivering both delivers m1 first and then m2
+<ul>
+<li>sending a message is something you do</li>
+<li>Receiving a message is something that happens to you</li>
+<li>Delivering a message is something you can do with a message you receive (you queue up a received messages and wait to deliver them)</li>
+<li>Violation of FIFO delivery</li>
+<li><img src="Pasted%20image%2020231015190423.png" alt="Desktop View"></li>
+<li>What can we do to implement FIFO delivery
+<ul>
+<li>Sequence numbers: Tag your messages with sender id and sender sequence number</li>
+<li>senders increment there sequence number after sending the message</li>
+<li>if a received message sequence number is the SN of the prev message from that sender + 1, deliver that message</li>
+</ul>
+</li>
+<li>What will happen if a message doesn&rsquo;t gets delivered
+<ul>
+<li><img src="Pasted%20image%2020231015190818.png" alt="Desktop View"></li>
+<li>using sequence numbers only works well if you have reliable delivery</li>
+<li>TCP has reliable delivery
+<ul>
+<li>suppose we don&rsquo;t have reliable delivery</li>
+</ul>
+</li>
+<li><img src="Pasted%20image%2020231015191356.png" alt="Desktop View"></li>
+<li>Vacuously satisfies FIFO delivery</li>
+<li>After every message receive bob can send ack, this also guarantees FIFO delivery but is also slow and ack could also get lost</li>
+<li><img src="Pasted%20image%2020231015191839.png" alt="Desktop View"></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h3 id="causal-delivery">Causal Delivery</h3>
+<ul>
+<li>if m1 send happened before m2 send then m1&rsquo;s delivery must happen before m2&rsquo;s delivery</li>
+<li><img src="Pasted%20image%2020231015193400.png" alt="Desktop View"></li>
+<li>How to enforce causal delivery? (Hint: Using vector clocks)</li>
+<li>Correctness property of execution
+<ul>
+<li>FIFO delivery</li>
+<li>causal delivery</li>
+<li>Totally ordered delivery</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h3 id="totally-ordered-delivery">Totally Ordered Delivery</h3>
+<ul>
+<li>if a process delivers m1 and then m2, then all processes delivering both m1 and m2 deliver m1 first and then m2</li>
+<li><img src="Pasted%20image%2020231015194417.png" alt="Desktop View"></li>
+</ul>
+</li>
+</ul>
+
+</article>
+
+            </div>
+        </main>
+    </body></html>

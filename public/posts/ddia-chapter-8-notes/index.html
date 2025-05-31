@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en-us"><head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+   <meta name="description" content="
+anything that can go wrong will go wrong
+This chapter is a thoroughly pessimistic and depressing overview of things that may go wrong in a distributed system
+working with distributed systems vs writing software for on a single computer
+
+problems with networks
+clocks and timing issues
+
+
+
+Faults and Partial Failures
+
+An individual computer with good software is usually either fully functional or entirely broken, but not something in between
+when the hardware is working correctly, the same operation always produces the same result (it is deterministic)
+The design goal of computer is always correct computation. Why so?
+
+if an internal fault occurs like (e.g., memory corruption or a loose connector), we prefer a computer to crash completely rather than returning a wrong result because wrong results are difficult and confusing to deal with
+computers hide the fuzzy physical reality on which they are implemented and present an idealized system mode
+
+
+writing software that runs on several computers, connected by a network, the situation is fundamentally different
+Partial Failure: In a distributed system, there may well be some parts of the system that are broken in some unpredictable way, even though other parts of the system are working fine
+The difficulty is that partial failures are nondeterministic
+
+if you try to do anything involving multiple nodes and the network, it may sometimes work and sometimes unpredictably fail
+
+
+This nondeterminism and possibility of partial failures is what makes distributed systems hard to work with
+
+
+
+Cloud Computing and Supercomputing
+
+
+HPC vs Cloud Computing
+
+  
+    
+      High-Performance Computing
+      Cloud Computing
+    
+  
+  
+    
+      Supercomputers with thousands of CPUs for scientific tasks
+      Multi-tenant datacenters shared by numerous organizations
+    
+    
+      Checkpointing to restart computations from last checkpoint
+      Commodity computers connected via IP network
+    
+    
+      Deals with partial failure by escalating into total failure
+      Elastic/on-demand resource allocation and uninterrupted service for internet-related applications
+    
+    
+      Typically built from specialized hardware, where each node is quite reliable
+      Made using commodity hardware which provides equivalent performance but has a higher rate of failure
+    
+    
+      Supercomputers often use specialized network topologies, such as multi-dimensional meshes and toruses, which yield better performance
+      Datacenter networks are often based on IP and Ethernet, arranged in Clos topologies to provide high bisection bandwidth
+    
+  
+
+
+The bigger a system gets, the more likely it is that one of its components is broken. In a system with thousands of nodes, it is reasonable to assume that something is always broken
+If the system can tolerate failed nodes and still keep working as a whole, that is a very useful feature for operations and maintenance
+If we want to make distributed systems work, we must accept the possibility of partial failure and build fault-tolerance mechanisms into the software
+build a reliable system from unreliable components
+
+Unreliable Networks
+
+shared-nothing systems: a bunch of machines connected by a network. The network is the only way those machines can communicate
+The internet and most internal networks in datacenters (often Ethernet) are asynchronous packet networks. In this kind of network, one node can send a message (a packet) to another node, but the network gives no guarantees
+Things can that go wrong?
+
+request may have been lost (someone unplugged a network cable)
+request may be waiting in a queue and will be delivered later (network or recipient are overloaded)
+remote node failure (crash or powered down)
+garbage collection pauses
+request processed by remote node but response lost in network/response has been delayed (network or own machine overloaded)
+
+
+The sender can’t even tell whether the packet was delivered: the only option is for the recipient to send a response message, which may in turn be lost or delayed
+The usual way of handling this issue is a timeout: after some time you give up waiting and assume that the response is not going to arrive. But in this case also we don&rsquo;t know whether the remote host got the request or not.
+
+
+
+Network Faults in Practice
+
+systemic studies indicate network faults can be can be surprisingly common even in controlled environments like datacenters
+studies of Network Faults in datacenters
+
+~12 network faults per month in a mid-sized datacenter of which half disconnected a single machine, and half disconnected an entire rack
+On studying the failure rates of of components like top-of-rack switches, aggregation switches, and load balancers It found that adding redundant networking gear doesn’t reduce faults as much as you might hope, since it doesn’t guard against human error
+faults can occur during a software upgrade for a switch could trigger a network topology reconfiguration, during which network packets could be delayed for more than a minute
+
+
+Even if network faults are rare in your environment, the fact that faults can occur means that your software needs to be able to handle them
+Handling network faults doesn’t necessarily mean tolerating them
+
+you do need to know how your software reacts to network problems and ensure that the system can recover from them
+Chaos Monkey: deliberately trigger network problems and test the system’s response
+
+
+
+
+
+Detecting Faults
+
+systems need to automatically detect faults
+
+A load balancer needs to stop sending requests to a dead node
+In a single leader database if the leader fails then one of the followers needs to be promoted to leader
+
+
+How can we tell if a node is dead ?
+
+if the machine is reachable but the process crashed then os will refuse connection on that port
+if the process crashed but the the os is running then a script can notify other nodes about the crash so that another node can takeover quickly
+Detecting link failure at hardware level needs access to management interface of network switches. If we are connecting via internet or in a shared datacenter that option is gone
+If a router is sure that the IP address you’re trying to connect to is unreachable, it may reply to you with an ICMP Destination Unreachable packet
+
+
+Even if the TCP acknowledges that the packet was delivered there is no guarantee that the application would have handled it before crashing. To know whether an request succeeded the application needs to send a positive response
+if something has gone wrong we can retry(TCP retries or application level retries) a few times, wait for a timeout to elapse and declare the node dead
+
+Timeouts and Unbounded Delays
+
+If a timeout is the only sure way of detecting a fault, then how long should the time‐ out be?
+long time out: a long wait until a node is declared dead and during this time, users may have to wait or see error messages
+short time out: detects faults faster, but carries a higher risk of incorrectly declaring a node dead when in fact it has only suffered a temporary slowdown
+what is a reasonable time out period to use?
+
+suppose in a system every packet is delivered within $d$ time or it is lost
+we can assume that a non failed node handles the request in $r$ time
+a reasonable delay to expect should be $2d &#43; r$ under these guarantees
+
+
+Most systems don&rsquo;t operate under such guarantees: asynchronous networks have unbounded delays(there is no upper time limit on the time it may take for a packet to arrive)
+
+
+
+Network congestion and queueing
+
+queueing at different places
+
+network switch
+
+Network congestion: when multiple nodes attempt to send packets to the same destination, causing a delay in packet transmission as they are queued up within the network switch.
+
+
+operating system
+
+if all CPU cores are currently busy, the incoming request from the network is queued by the operating system until the application is ready to handle it
+
+
+VM manager
+
+In virtualized environments, a running operating system is often paused for tens of milliseconds while another virtual machine uses a CPU core. During this time, the VM cannot consume any data from the network, so the incoming data is queued (buffered) by the virtual machine monitor
+
+
+Sender
+
+TCP performs flow control (also known as congestion avoidance or backpressure), in which a node limits its own rate of sending in order to avoid overloading a network link or the receiving node
+
+
+
+
+In public clouds and multi-tenant datacenters, resources like network links, switches, and even machine components are shared among many customers. This sharing can lead to variable network delays, especially when batch workloads, such as MapReduce
+In such scenarios to find the time out period we can measure the distribution of network round-trip times over an extended period, and over many machines, to determine the expected variability of delays
+rather than using configured constant timeouts, systems can continually measure response times and their variability (jitter), and automatically adjust time‐ outs according to the observed response time distribution. (checkout TCP retransmission timeout it works in the same way)
+
+
+
+Synchronous Versus Asynchronous Networks
+
+can we deliver packets with a fixed maximum delay and no packets drop making the systems much simpler?
+To answer this question, it’s interesting to compare datacenter networks to the traditional fixed-line telephone network(non-cellular, non-VoIP)
+
+we hardly see any delayed audio frames and dropped calls in telephone network. A phone call requires a constantly low end-to-end latency and enough bandwidth to transfer the audio samples of your voice. It would be nice to have such similar reliability and predictability in computer networks
+In a call over a telephone network a circuit is established a fixed, guaranteed amount of bandwidth is allocated for the call, along the entire route between the two callers
+When a call is established, it is allocated 16 bits of space within each frame (in each direction). Thus, for the duration of the call, each side is guaranteed to be able to send exactly 16 bits of audio data every 250 microseconds
+This kind of network is synchronous: even as data passes through several routers, it does not suffer from queueing, because the 16 bits of space for the call have already been reserved in the next hop of the network
+because there is no queueing, the maximum end-to-end latency of the network is fixed. We call this a bounded delay
+
+
+
+
+
+Can we not simply make network delays predictable?
+
+A circuit network has fixed reserved bandwidth which no one else can use when the circuit is established, whereas the packets of a TCP connection opportunistically use whatever network bandwidth is available.
+If datacenter networks and the internet were circuit-switched networks, it would be possible to establish a guaranteed maximum round-trip time when a circuit was set up
+Ethernet and IP are packet-switched protocols, which suffer from queueing and thus unbounded delays in the network. No concept of circuit
+Why do datacenter networks and the internet use packet switching?
+
+The answer is that they are optimized for bursty traffic
+A circuit is good for an audio or video call, which needs to transfer a fairly constant number of bits per second for the duration of the call
+if you want to transfer a file over a circuit network, you would have to guess a bandwidth allocation.
+If you guess too low, the transfer is unnecessarily slow
+If you guess too high, the circuit cannot be set up (because the net‐ work cannot allow a circuit to be created if its bandwidth allocation cannot be guaranteed)
+using circuits for bursty data transfers wastes network capacity and makes transfers unnecessarily slow.
+TCP dynamically adapts the rate of data transfer to the available network capacity.
+
+
+
+
+
+Unreliable Clocks
+
+durations vs point in time
+durations: request timed out, 99th percentile response time, qps a service handles
+point-in-time: when the remainder is sent, when does this cache entry expire
+
+Monotonic Versus Time-of-Day Clocks
+
+
+Time-of-day clocks
+
+What you intuitively expect a clock to be also known as wall clock
+Time-of-day clocks are usually synchronized with NTP
+time-of-day clocks also have various oddities
+
+if the local clock is too far ahead of the NTP server, it may be forcibly reset and appear to jump back to a previous point in time
+These jumps, as well as the fact that they often ignore leap seconds, make time-of-day clocks unsuitable for measuring elapsed time
+
+
+
+
+
+Monotonic clocks
+
+measuring a duration (time interval), such as a timeout or a service’s response time
+check the value of monotonic time at two points and the difference between them tells how much time has elapsed
+NTP may adjust the frequency at which the monotonic clock moves forward (this is known as slewing the clock) if it detects that the computer’s local quartz is moving faster or slower than the NTP server
+By default, NTP allows the clock rate to be spee‐ ded up or slowed down by up to 0.05%, but NTP cannot cause the monotonic clock to jump forward or backward.
+
+
+In a distributed system, using a monotonic clock for measuring elapsed time (e.g., timeouts) is usually fine, because it doesn’t assume any synchronization between different nodes’ clocks
+
+
+
+Clock Synchronization and Accuracy
+
+Monotonic clocks don’t need synchronization, but time-of-day clocks need to be set according to an NTP server or other external time source in order to be useful.
+Our methods for getting a clock to tell the correct time isn&rsquo;t nearly as reliable or accurate
+
+The quartz clock in a computer is not very accurate: it drifts. Google assumes a clock drift of 200 ppm (parts per million) for its servers which is equivalent to 6 ms drift for a clock that is resynchronized with a server every 30 seconds, or 17 seconds drift for a clock that is resynchronized once a day
+If a computer’s clock differs too much from an NTP server, it may refuse to synchronize, or the local clock will be forcibly reset
+If a node is accidentally firewalled off from NTP servers, the misconfiguration may go unnoticed for some time.
+NTP synchronization can only be as good as the network delay, so there is a limit to its accuracy when you’re on a congested network with variable packet delays.
+Some NTP servers are wrong or misconfigured, reporting time that is off by hours. NTP clients are quite robust, because they query several servers and ignore outliers
+Leap seconds result in a minute that is 59 seconds or 61 seconds long, which messes up timing assumptions in systems that are not designed with leap seconds in mind (many major crashes due to leap seconds)
+In virtual machines, the hardware clock is virtualized, When a CPU core is shared between virtual machines, each VM is paused for tens of milli‐ seconds while another VM is running From an application’s point of view, this pause manifests itself as the clock suddenly jumping forward
+
+
+possible to achieve very good clock accuracy
+
+MiFID II draft European regulation for financial institutions requires all high-frequency trading funds to synchronize their clocks to within 100 microseconds of UTC
+Such accuracy can be achieved using GPS receivers, the Precision Time Protocol (PTP), and careful deployment and monitoring
+
+
+
+
+
+Relying on Synchronized Clocks
+
+robust software needs to be prepared to deal with incorrect clocks.
+incorrect clocks easily go unnoticed.
+if its quartz clock is defective or its NTP client is misconfigured, most things will seem to work fine, even though its clock gradually drifts further and further away from reality
+if you use software that requires synchronized clocks, it is essential that you also carefully monitor the clock offsets between all the machines.
+
+
+
+Timestamps for ordering events
+
+if two clients write to a distributed database, who got there first? Which write is the more recent one?
+Conflicts may happen when time stamps fail to order even correctly. When a write has happened one after the other but their time stamp do not reflect that, the node will incorrectly drop the older value and accept the recent value
+This conflict resolution strategy is called last write wins (LWW), and it is widely used in both multi-leader replication and leaderless databases such as Cassandra
+
+Database writes can mysteriously disappear: a node with a lagging clock is unable to overwrite values previously written by a node with a fast clock
+LWW cannot distinguish between writes that occurred sequentially in quick succession i.e. concurrent writes
+So-called logical clocks which are based on incrementing counters rather than an oscillating quartz crystal, are a safer alternative for ordering events
+
+
+
+
+
+Clock readings have a confidence interval
+
+Even if we are able get a very fine grained measurement, that doesn&rsquo;t mean value is accurate to that precision. (drift, network latency,network congestion can make the clock readings variable)
+it doesn’t make sense to think of a clock reading as a point in time—it is more like a range of times, within a confidence interval: for example, a system may be 95% confident that the time now is between 10.3 and 10.5 seconds past the minute
+The uncertainty bound can be calculated based on your time source(GPS receiver, atomic clock, uncertainty is based on the expected quartz drift since your last sync with the server, plus the NTP server’s uncertainty, plus the network round-trip time to the server).Unfortunately, most systems don’t expose this uncertainty: for example, when you call clock_gettime(), the return value doesn’t tell you the expected error of the timestamp
+An interesting exception is Google’s TrueTime API in Spanner, which explicitly reports the confidence interval on the local clock. When you ask it for the current time, you get back two values: [earliest, latest], which are the earliest possible and the latest possible timestamp
+
+
+
+Synchronized clocks for global snapshots
+
+The most common implementation of snapshot isolation requires a monotonically increasing transaction ID
+However, when a database is distributed across many machines, potentially in multiple datacenters, a global, monotonically increasing transaction ID (across all partitions) is difficult to generate
+Can we use the timestamps from synchronized time-of-day clocks as transaction IDs? If we could get the synchronization good enough, they would have the right properties
+Google spanner snapshot isolation implementation:
+
+if you have two confidence intervals, each consisting of an earliest and latest possible timestamp $(A = [A_{earliest}, A_{latest}] \ and \ B = [B_{earliest}, B_{latest}])$, and those two intervals do not overlap $(i.e., A_{earliest} &lt; A_{latest} &lt; B_{earliest} &lt; B_{latest})$, then B definitely happened after A—there can be no doubt. Only if the intervals overlap are we unsure in which order A and B happened
+In order to ensure that transaction timestamps reflect causality, Spanner deliberately waits for the length of the confidence interval before committing a read-write transaction
+By doing so, it ensures that any transaction that may read the data is at a sufficiently later time, so their confidence intervals do not overlap.
+In order to keep the wait time as short as possible, Spanner needs to keep the clock uncertainty as small as possible
+
+
+
+
+
+
+
+Process Pauses
+
+a garbage collector (GC) that occasionally needs to stop all running threads. These “stop-the-world” GC pauses have sometimes been known to last for several minutes
+In virtualized environments, a virtual machine can be suspended (pausing the execution of all processes and saving the contents of memory to disk) and resumed
+On end-user devices such as laptops, execution may also be suspended and resumed arbitrarily
+When the operating system context-switches to another thread, or when the hypervisor switches to a different virtual machine (when running in a virtual machine), the currently running thread can be paused at any arbitrary point in the code.In the case of a virtual machine, the CPU time spent in other virtual machines is known as steal time
+If the application performs synchronous disk access, a thread may be paused waiting for a slow disk I/O operation to complete
+If the operating system is configured to allow swapping to disk (paging), a simple memory access may result in a page fault that requires a page from disk to be loaded into memory. The thread is paused while this slow I/O operation takes place.
+All of these occurrences can preempt the running thread at any point and resume it at some later time, without the thread even noticing.
+A node in a distributed system must assume that its execution can be paused for a significant length of time at any point, even in the middle of a function
+Limiting the impact of garbage collection
+
+An emerging idea is to treat GC pauses like brief planned outages of a node, and to let other nodes handle requests from clients while one node is collecting its garbage
+If the runtime can warn the application that a node soon requires a GC pause, the application can stop sending new requests to that node, wait for it to finish process‐ ing outstanding requests, and then perform the GC while no requests are in progress
+A variant of this idea is to use the garbage collector only for short-lived objects (which are fast to collect) and to restart processes periodically, before they accumulate enough long-lived objects to require a full GC of long-lived objects
+One node can be restarted at a time, and traffic can be shifted away from the node before the planned restart, like in a rolling upgrade
+
+
+
+
+
+Knowledge, Truth, and Lies
+
+The consequences of these issues(unreliable network with variable delays, and the systems may suffer from partial failures, unreliable clocks, and processing pauses) in distributed systems are profoundly disorienting if you’re not used to distributed systems
+A node can only find out what state another node is in (what data it has stored, whether it is correctly functioning, etc.) by exchanging messages with it
+In a distributed system, we can state the assumptions we are making about the behaviour (the system model) and design the actual system in such a way that it meets those assumptions
+Algorithms can be proved to function correctly within a certain system model.
+This means that reliable behaviour is achievable, even if the underlying system model provides very few guarantees.
+
+
+
+The Truth Is Defined by the Majority
+
+network with an asymmetric fault: a node is able to receive all messages sent to it, but any outgoing messages from that node are dropped or delayed
+
+Even though the node is working, other node cannot hear its response and will declare it dead after some time
+In a slightly better scenario, if the semi disconnected node detects that none of the messages it is sending is getting any response it may and realize that there may be a fault in the network. Nevertheless the node may be declared dead
+In a third scenario there may be long GC pauses that stops sending and receiving request and response. The other nodes wait and retry and finally declare the node dead.
+
+
+The moral of these stories is that a node cannot necessarily trust its own judgment of a situation
+A distributed system cannot exclusively rely on a single node, because a node may fail at any time, potentially leaving the system stuck and unable to recover
+many distributed algorithms rely on a quorum, that is, voting among the nodes
+If a quorum of nodes declares another node dead, then it must be considered dead, even if that node still very much feels alive Xd
+
+The leader and the lock
+
+Frequently, a system requires there to be only one of some thing?
+
+Only one node is allowed to be the leader for a database partition, to avoid split brain
+Only one transaction or client is allowed to hold the lock for a particular resource or object, to prevent concurrently writing to it and corrupting it
+Only one user is allowed to register a particular username, because a username must uniquely identify a user
+
+
+if a node believes that it is the chosen one(even though majority of the nodes have declared it dead) and continues to behave like it, it could cause problems
+data corruption bug due to an incorrect implementation of locking
+
+you want to ensure that a file in a storage service can only be accessed by one client at a time because multiple access can cause the data to be corrupted
+we implement this by requiring a client to obtain a lease from a lock service before accessing the file
+if the client holding the lease is paused for too long, its lease expires. Another client can obtain a lease for the same file, and start writing to the file
+When the paused client comes back, it believes that it still has valid lease and proceeds to write and corrupts the file
+
+
+
+Fencing tokens
+
+We need to ensure that node is not under the false belief that it is the chosen one. A simple technique that achieves this goal is called fencing
+every time the lock server grants a lock or lease, it also returns a fencing token, which is a number that increases every time a lock is granted
+We can then require that every time a client sends a write request to the storage service, it must include its current fencing token.
+When a dead client comes back online and sends its write request to the client along with a fencing token, its write will be rejected if a write with a higher token value has already been processed
+
+
+
+
+
+
+
+Byzantine Faults
+
+Fencing tokens can detect and block a node that is inadvertently acting in error, however if a node acts maliciously and wants to subvert system guarantees it could easily do it by sending fake messages
+The discussion in the book is limited to the assumption that nodes are unreliable but honest
+Distributed systems problems become much harder if there is a risk that nodes may “lie” (send arbitrary faulty or corrupted responses)
+if a node may claim to have received a particular message when in fact it didn’t. Such behaviour is known as a Byzantine fault, and the problem of reaching consensus in this untrusting environment is known as the Byzantine Generals Problem
+A system is Byzantine fault-tolerant if it continues to operate correctly even if some of the nodes are malfunctioning and not obeying the protocol, or if malicious attackers are interfering with the network.
+Situations where Byzantine fault may arise
+
+In aerospace environments, the data in a computer’s memory or CPU register could become corrupted by radiation leading it to respond to other nodes in arbitrarily unpredictable ways
+In a system with multiple participating organizations, some participants may attempt to cheat or defraud others. In such circumstances, it is not safe for a node to simply trust another node’s messages. e.g. Bitcoin
+
+
+The discussion here is limited to non byzantine fault tolerant systems
+A bug in the software could be regarded as a Byzantine fault, but if you deploy the same software to all nodes, then a Byzantine fault-tolerant algorithm cannot save you
+To use this approach against bugs, you would have to have four independent implementations of the same software and hope that a bug only appears in one of the four implementations
+
+
+
+System Model and Reality
+
+Algorithms need to be written in a way that does not depend too heavily on the details of the hardware and software configuration on which they are run
+This in turn requires that we somehow formalize the kinds of faults that we expect to happen in a system
+We do this by defining a system model, which is an abstraction that describes what things an algorithm may assume
+
+System models wrt timing assumptions
+
+Synchronous model: The synchronous model assumes bounded network delay, bounded process pauses,and bounded clock error. Not a realistic model for most practical systems
+Partially synchronous model: Partial synchrony means that a system behaves like a synchronous system most of the time, but it sometimes exceeds the bounds for network delay, process pauses, and clock drift. This is a realistic model of many systems: most of the time, networks and processes are quite well behaved
+Asynchronous model: an algorithm is not allowed to make any timing assumptions—in fact, it does not even have a clock (so it cannot use timeouts)
+
+
+system model wrt node failure assumptions
+
+Crash-stop faults: Node can stop in only one way i.e. crashing and never come back
+Crash-recovery faults: We assume that nodes may crash at any moment, and perhaps start responding again after some unknown time. In this failure model nodes are assumed to have stable storage.
+Byzantine (arbitrary) faults: Nodes may do absolutely anything
+
+
+For modeling real systems, the partially synchronous model with crash-recovery faults is generally the most useful model.
+
+
+
+
+
+Correctness of an algorithm
+
+what is means for an algorithm to be correct?
+we can write down the properties we want of a distributed algorithm to define what it means to be correct
+
+Safety and liveness
+
+safety
+
+Safety is often informally defined as nothing bad happens
+If a safety property is violated, we can point at a particular point in time at which it was broken
+After a safety property has been violated, the violation cannot be undone the damage is already done
+For distributed algorithms, it is common to require that safety properties always hold, in all possible situations of a system model
+
+
+liveness
+
+it is defined as something good eventually happens
+liveness properties often include the word “eventually” in their definition
+it may not hold at some point in time, but there is always hope that it may be satisfied in the future
+with liveness properties we are allowed to make caveats: for example, we could say that a request needs to receive a response only if a majority of nodes have not crashed
+
+
+
+
+
+Mapping system models to the real world
+
+When implementing distributed systems messy reality of real world come out. It becomes clear that system model is a simplified abstraction of reality
+Quorum algorithms rely on node remembering the data, that it claims to have stored. If a node may suffer from amnesia and forget previously stored data, that breaks the quorum condition
+what happens when assumption gets broken -&gt; correctness of algorithm gets broken
+Perhaps a new system model? assumption being, storage nodes mostly survive crashes, but sometimes may be lost, This makes reasoning harder
+The theoretical description of an algorithm can declare certain things correct under certain assumptions, but in real world those assumptions can break and needs to be handled.
+This doesn&rsquo;t make theoretical models useless, quite the opposite, They are incredibly helpful for distilling down the complexity of real systems to a manageable set of faults that we can reason about
+We can prove algorithms correct by showing that their properties always hold in some system model.
+Proving an algorithm correct does not mean its implementation on a real system will necessarily always behave correctly
+But it’s a very good first step, because the theoretical analysis can uncover problems in an algorithm that might remain hidden for a long time in a real system, and that only come to bite you when your assumptions (e.g., about timing) are defeated due to unusual circumstances
+
+
+
+
+
+
+">  
+
+  <title>
+    
+      Trouble with distributed systems
+    
+  </title>
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/" />
+  
+  
+  
+  <link rel="stylesheet" href="/css/main.900100e9dbee2d56c58fac8bb717037cae7e26a9c36c29d2ff587bdd65f0cbbe510b41d81a3bb234919cdfdc7550d786b2fab70c8fc507772d732fe097106d12.css" integrity="sha512-kAEA6dvuLVbFj6yLtxcDfK5&#43;JqnDbCnS/1h73WXwy75RC0HYGjuyNJGc39x1UNeGsvq3DI/FB3ctcy/glxBtEg==" />
+   <script>
+  MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$','$$'], ['\\[', '\\]']],
+      processEscapes: true,
+      processEnvironments: true
+    },
+    options: {
+      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+    }
+  };
+
+  window.addEventListener('load', (event) => {
+      document.querySelectorAll("mjx-container").forEach(function(x){
+        x.parentElement.classList += 'has-jax'})
+    });
+
+</script>
+<script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+ 
+</head>
+<body a="auto">
+        <main class="page-content" aria-label="Content">
+            <div class="w">
+                <div class="post-meta">
+                    <a href="/">..</a>
+
+                    <p>
+                        <time datetime="2022-05-22 13:57:56 &#43;0530 IST">
+                            2022-05-22
+                        </time>
+                    </p>
+                </div>
+
+<article>
+    <h1>Trouble with distributed systems</h1>
+
+    
+
+    <ul>
+<li><em>anything that can go wrong will go wrong</em></li>
+<li>This chapter is a thoroughly pessimistic and depressing overview of things that may go wrong in a distributed system</li>
+<li>working with distributed systems vs writing software for on a single computer
+<ul>
+<li>problems with networks</li>
+<li>clocks and timing issues</li>
+</ul>
+</li>
+<li>
+<h2 id="faults-and-partial-failures">Faults and Partial Failures</h2>
+<ul>
+<li>An individual computer with good software is usually either fully functional or entirely broken, but not something in between</li>
+<li>when the hardware is working correctly, the same operation always produces the same result (it is deterministic)</li>
+<li>The design goal of computer is always correct computation. Why so?
+<ul>
+<li>if an internal fault occurs like (e.g., memory corruption or a loose connector), we prefer a computer to crash completely rather than returning a wrong result because wrong results are difficult and confusing to deal with</li>
+<li>computers hide the fuzzy physical reality on which they are implemented and present an idealized system mode</li>
+</ul>
+</li>
+<li>writing software that runs on several computers, connected by a network, the situation is fundamentally different</li>
+<li><em>Partial Failure:</em> In a distributed system, there may well be some parts of the system that are broken in some unpredictable way, even though other parts of the system are working fine</li>
+<li>The difficulty is that partial failures are <em>nondeterministic</em>
+<ul>
+<li>if you try to do anything involving multiple nodes and the network, it may sometimes work and sometimes unpredictably fail</li>
+</ul>
+</li>
+<li>This <em>nondeterminism</em> and possibility of <em>partial failures</em> is what makes distributed systems hard to work with</li>
+</ul>
+</li>
+<li>
+<h3 id="cloud-computing-and-supercomputing">Cloud Computing and Supercomputing</h3>
+</li>
+</ul>
+<h3>HPC vs Cloud Computing</h3>
+<table>
+  <thead>
+    <tr>
+      <th>High-Performance Computing</th>
+      <th>Cloud Computing</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Supercomputers with thousands of CPUs for scientific tasks</td>
+      <td>Multi-tenant datacenters shared by numerous organizations</td>
+    </tr>
+    <tr>
+      <td>Checkpointing to restart computations from last checkpoint</td>
+      <td>Commodity computers connected via IP network</td>
+    </tr>
+    <tr>
+      <td>Deals with partial failure by escalating into total failure</td>
+      <td>Elastic/on-demand resource allocation and uninterrupted service for internet-related applications</td>
+    </tr>
+    <tr>
+      <td>Typically built from specialized hardware, where each node is quite reliable</td>
+      <td>Made using commodity hardware which provides equivalent performance but has a higher rate of failure</td>
+    </tr>
+    <tr>
+      <td>Supercomputers often use specialized network topologies, such as multi-dimensional meshes and toruses, which yield better performance</td>
+      <td>Datacenter networks are often based on IP and Ethernet, arranged in Clos topologies to provide high bisection bandwidth</td>
+    </tr>
+  </tbody>
+</table>
+<ul>
+<li>The bigger a system gets, the more likely it is that one of its components is broken. In a system with thousands of nodes, it is reasonable to assume that something is always broken</li>
+<li>If the system can tolerate failed nodes and still keep working as a whole, that is a very useful feature for operations and maintenance</li>
+<li>If we want to make distributed systems work, we must <em>accept the possibility of partial failure</em> and build fault-tolerance mechanisms into the software</li>
+<li><em>build a reliable system from unreliable components</em></li>
+<li>
+<h3 id="unreliable-networks">Unreliable Networks</h3>
+<ul>
+<li><em>shared-nothing systems:</em> a bunch of machines connected by a network. The network is the only way those machines can communicate</li>
+<li>The internet and most internal networks in datacenters (often Ethernet) are <em>asynchronous packet networks</em>. In this kind of network, one node can send a message (a packet) to another node, but the network gives no guarantees</li>
+<li>Things can that go wrong?
+<ul>
+<li>request may have been lost (someone unplugged a network cable)</li>
+<li>request may be waiting in a queue and will be delivered later (network or recipient are overloaded)</li>
+<li>remote node failure (crash or powered down)</li>
+<li>garbage collection pauses</li>
+<li>request processed by remote node but response lost in network/response has been delayed (network or own machine overloaded)</li>
+</ul>
+</li>
+<li>The sender can’t even tell whether the packet was delivered: the only option is for the recipient to send a response message, which may in turn be lost or delayed</li>
+<li>The usual way of handling this issue is a <em>timeout</em>: after some time you give up waiting and assume that the response is not going to arrive. But in this case also we don&rsquo;t know whether the remote host got the request or not.</li>
+</ul>
+</li>
+<li>
+<h3 id="network-faults-in-practice">Network Faults in Practice</h3>
+<ul>
+<li>systemic studies indicate network faults can be can be surprisingly common even in controlled environments like datacenters</li>
+<li>studies of Network Faults in datacenters
+<ul>
+<li>~12 network faults per month in a mid-sized datacenter of which half disconnected a single machine, and half disconnected an entire rack</li>
+<li>On studying the failure rates of of components like top-of-rack switches, aggregation switches, and load balancers It found that adding redundant networking gear doesn’t reduce faults as much as you might hope, since it doesn’t guard against human error</li>
+<li>faults can occur during a software upgrade for a switch could trigger a network topology reconfiguration, during which network packets could be delayed for more than a minute</li>
+</ul>
+</li>
+<li>Even if network faults are rare in your environment, the fact that faults can occur means that your <em>software needs to be able to handle them</em></li>
+<li>Handling network faults doesn’t necessarily mean tolerating them
+<ul>
+<li>you do need to know how your software reacts to network problems and ensure that the system can recover from them</li>
+<li>Chaos Monkey: deliberately trigger network problems and test the system’s response</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h3 id="detecting-faults">Detecting Faults</h3>
+<ul>
+<li>systems need to automatically detect faults
+<ul>
+<li>A load balancer needs to stop sending requests to a dead node</li>
+<li>In a single leader database if the leader fails then one of the followers needs to be promoted to leader</li>
+</ul>
+</li>
+<li>How can we tell if a node is dead ?
+<ul>
+<li>if the machine is reachable but the process crashed then os will refuse connection on that port</li>
+<li>if the process crashed but the the os is running then a script can notify other nodes about the crash so that another node can takeover quickly</li>
+<li>Detecting link failure at hardware level needs access to management interface of network switches. If we are connecting via internet or in a shared datacenter that option is gone</li>
+<li>If a router is sure that the IP address you’re trying to connect to is unreachable, it may reply to you with an ICMP Destination Unreachable packet</li>
+</ul>
+</li>
+<li>Even if the TCP acknowledges that the packet was delivered there is no guarantee that the application would have handled it before crashing. To know whether an request succeeded the application needs to send a positive response</li>
+<li>if something has gone wrong we can retry(TCP retries or application level retries) a few times, wait for a timeout to elapse and declare the node dead</li>
+<li>
+<h3 id="timeouts-and-unbounded-delays">Timeouts and Unbounded Delays</h3>
+<ul>
+<li>If a timeout is the only sure way of detecting a fault, then how long should the time‐ out be?</li>
+<li>long time out: a long wait until a node is declared dead and during this time, users may have to wait or see error messages</li>
+<li>short time out: detects faults faster, but carries a higher risk of incorrectly declaring a node dead when in fact it has only suffered a temporary slowdown</li>
+<li>what is a reasonable time out period to use?
+<ul>
+<li>suppose in a system every packet is delivered within $d$ time or it is lost</li>
+<li>we can assume that a non failed node handles the request in $r$ time</li>
+<li>a reasonable delay to expect should be $2d + r$ under these guarantees</li>
+</ul>
+</li>
+<li>Most systems don&rsquo;t operate under such guarantees: <em>asynchronous networks</em> have unbounded delays(there is no upper time limit on the time it may take for a packet to arrive)</li>
+</ul>
+</li>
+<li>
+<h3 id="network-congestion-and-queueing">Network congestion and queueing</h3>
+<ul>
+<li>queueing at different places
+<ul>
+<li>network switch
+<ul>
+<li><em>Network congestion:</em> when multiple nodes attempt to send packets to the same destination, causing a delay in packet transmission as they are queued up within the network switch.</li>
+</ul>
+</li>
+<li>operating system
+<ul>
+<li>if all CPU cores are currently busy, the incoming request from the network is queued by the operating system until the application is ready to handle it</li>
+</ul>
+</li>
+<li>VM manager
+<ul>
+<li>In virtualized environments, a running operating system is often paused for tens of milliseconds while another virtual machine uses a CPU core. During this time, the VM cannot consume any data from the network, so the incoming data is queued (buffered) by the virtual machine monitor</li>
+</ul>
+</li>
+<li>Sender
+<ul>
+<li>TCP performs flow control (also known as congestion avoidance or backpressure), in which a node limits its own rate of sending in order to avoid overloading a network link or the receiving node</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>In public clouds and multi-tenant datacenters, resources like network links, switches, and even machine components are shared among many customers. This sharing can lead to variable network delays, especially when batch workloads, such as MapReduce</li>
+<li>In such scenarios to find the time out period we can measure the distribution of network round-trip times over an extended period, and over many machines, to determine the expected variability of delays</li>
+<li>rather than using configured constant timeouts, systems can continually measure response times and their variability (jitter), and automatically adjust time‐ outs according to the observed response time distribution. (checkout TCP retransmission timeout it works in the same way)</li>
+</ul>
+</li>
+<li>
+<h2 id="synchronous-versus-asynchronous-networks">Synchronous Versus Asynchronous Networks</h2>
+<ul>
+<li>can we deliver packets with a fixed maximum delay and no packets drop making the systems much simpler?</li>
+<li>To answer this question, it’s interesting to compare datacenter networks to the traditional fixed-line telephone network(non-cellular, non-VoIP)
+<ul>
+<li>we hardly see any delayed audio frames and dropped calls in telephone network. A phone call requires a constantly low end-to-end latency and enough bandwidth to transfer the audio samples of your voice. It would be nice to have such similar reliability and predictability in computer networks</li>
+<li>In a call over a telephone network a <em>circuit</em> is established a fixed, guaranteed amount of bandwidth is allocated for the call, along the entire route between the two callers</li>
+<li>When a call is established, it is allocated 16 bits of space within each frame (in each direction). Thus, for the duration of the call, each side is guaranteed to be able to send exactly 16 bits of audio data every 250 microseconds</li>
+<li>This kind of network is <em>synchronous</em>: even as data passes through several routers, it does not suffer from queueing, because the 16 bits of space for the call have already been reserved in the next hop of the network</li>
+<li>because there is no queueing, the maximum end-to-end latency of the network is fixed. We call this a <em>bounded delay</em></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h3 id="can-we-not-simply-make-network-delays-predictable">Can we not simply make network delays predictable?</h3>
+<ul>
+<li>A circuit network has fixed reserved bandwidth which no one else can use when the circuit is established, whereas the packets of a TCP connection opportunistically use whatever network bandwidth is available.</li>
+<li>If datacenter networks and the internet were circuit-switched networks, it would be possible to establish a guaranteed maximum round-trip time when a circuit was set up</li>
+<li>Ethernet and IP are packet-switched protocols, which suffer from queueing and thus unbounded delays in the network. No concept of circuit</li>
+<li>Why do datacenter networks and the internet use packet switching?
+<ul>
+<li>The answer is that they are optimized for bursty traffic</li>
+<li>A circuit is good for an audio or video call, which needs to transfer a fairly constant number of bits per second for the duration of the call</li>
+<li>if you want to transfer a file over a circuit network, you would have to guess a bandwidth allocation.</li>
+<li>If you guess too low, the transfer is unnecessarily slow</li>
+<li>If you guess too high, the circuit cannot be set up (because the net‐ work cannot allow a circuit to be created if its bandwidth allocation cannot be guaranteed)</li>
+<li>using circuits for bursty data transfers wastes network capacity and makes transfers unnecessarily slow.</li>
+<li>TCP dynamically adapts the rate of data transfer to the available network capacity.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h2 id="unreliable-clocks">Unreliable Clocks</h2>
+<ul>
+<li>durations vs point in time</li>
+<li><em>durations:</em> request timed out, 99th percentile response time, qps a service handles</li>
+<li><em>point-in-time:</em> when the remainder is sent, when does this cache entry expire</li>
+<li>
+<h3 id="monotonic-versus-time-of-day-clocks">Monotonic Versus Time-of-Day Clocks</h3>
+<ul>
+<li>
+<h4 id="time-of-day-clocks">Time-of-day clocks</h4>
+<ul>
+<li>What you intuitively expect a clock to be also known as wall clock</li>
+<li>Time-of-day clocks are usually synchronized with NTP</li>
+<li>time-of-day clocks also have various oddities
+<ul>
+<li>if the local clock is too far ahead of the NTP server, it may be forcibly reset and appear to jump back to a previous point in time</li>
+<li>These jumps, as well as the fact that they often ignore leap seconds, make time-of-day clocks unsuitable for measuring elapsed time</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h4 id="monotonic-clocks">Monotonic clocks</h4>
+<ul>
+<li>measuring a duration (time interval), such as a timeout or a service’s response time</li>
+<li>check the value of monotonic time at two points and the difference between them tells how much time has elapsed</li>
+<li>NTP may adjust the frequency at which the monotonic clock moves forward (this is known as slewing the clock) if it detects that the computer’s local quartz is moving faster or slower than the NTP server</li>
+<li>By default, NTP allows the clock rate to be spee‐ ded up or slowed down by up to 0.05%, but NTP cannot cause the monotonic clock to jump forward or backward.</li>
+</ul>
+</li>
+<li>In a distributed system, using a monotonic clock for measuring elapsed time (e.g., timeouts) is usually fine, because it doesn’t assume any synchronization between different nodes’ clocks</li>
+</ul>
+</li>
+<li>
+<h3 id="clock-synchronization-and-accuracy">Clock Synchronization and Accuracy</h3>
+<ul>
+<li>Monotonic clocks don’t need synchronization, but time-of-day clocks need to be set according to an NTP server or other external time source in order to be useful.</li>
+<li>Our methods for getting a clock to tell the correct time isn&rsquo;t nearly as reliable or accurate
+<ul>
+<li>The quartz clock in a computer is not very accurate: it drifts. Google assumes a clock drift of 200 ppm (parts per million) for its servers which is equivalent to 6 ms drift for a clock that is resynchronized with a server every 30 seconds, or 17 seconds drift for a clock that is resynchronized once a day</li>
+<li>If a computer’s clock differs too much from an NTP server, it may refuse to synchronize, or the local clock will be forcibly reset</li>
+<li>If a node is accidentally firewalled off from NTP servers, the misconfiguration may go unnoticed for some time.</li>
+<li>NTP synchronization <em>can only be as good as the network delay</em>, so there is a limit to its accuracy when you’re on a congested network with variable packet delays.</li>
+<li>Some NTP servers are wrong or misconfigured, reporting time that is off by hours. NTP clients are quite robust, because they query several servers and ignore outliers</li>
+<li>Leap seconds result in a minute that is 59 seconds or 61 seconds long, which messes up timing assumptions in systems that are not designed with leap seconds in mind (many major crashes due to leap seconds)</li>
+<li>In virtual machines, the hardware clock is virtualized, When a CPU core is shared between virtual machines, each VM is paused for tens of milli‐ seconds while another VM is running From an application’s point of view, this pause manifests itself as the clock suddenly jumping forward</li>
+</ul>
+</li>
+<li>possible to achieve very good clock accuracy
+<ul>
+<li>MiFID II draft European regulation for financial institutions requires all high-frequency trading funds to synchronize their clocks to within 100 microseconds of UTC</li>
+<li>Such accuracy can be achieved using GPS receivers, the Precision Time Protocol (PTP), and careful deployment and monitoring</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h3 id="relying-on-synchronized-clocks">Relying on Synchronized Clocks</h3>
+<ul>
+<li>robust software needs to be prepared to deal with incorrect clocks.</li>
+<li>incorrect clocks easily go unnoticed.</li>
+<li>if its quartz clock is defective or its NTP client is misconfigured, most things will seem to work fine, even though its clock gradually <em>drifts further and further away from reality</em></li>
+<li>if you use software that requires synchronized clocks, it is essential that you also carefully monitor the clock offsets between all the machines.</li>
+</ul>
+</li>
+<li>
+<h4 id="timestamps-for-ordering-events">Timestamps for ordering events</h4>
+<ul>
+<li>if two clients write to a distributed database, who got there first? Which write is the more recent one?</li>
+<li>Conflicts may happen when time stamps fail to order even correctly. When a write has happened one after the other but their time stamp do not reflect that, the node will incorrectly drop the older value and accept the recent value</li>
+<li>This conflict resolution strategy is called last write wins (LWW), and it is widely used in both multi-leader replication and leaderless databases such as Cassandra
+<ul>
+<li>Database writes can mysteriously disappear: a node with a lagging clock is unable to overwrite values previously written by a node with a fast clock</li>
+<li>LWW cannot distinguish between writes that occurred sequentially in quick succession i.e. concurrent writes</li>
+<li>So-called logical clocks which are based on incrementing counters rather than an oscillating quartz crystal, are a safer alternative for ordering events</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h4 id="clock-readings-have-a-confidence-interval">Clock readings have a confidence interval</h4>
+<ul>
+<li>Even if we are able get a very fine grained measurement, that doesn&rsquo;t mean value is accurate to that precision. (drift, network latency,network congestion can make the clock readings variable)</li>
+<li>it doesn’t make sense to think of a clock reading as a point in time—it is more like a range of times, within a confidence interval: for example, a system may be 95% confident that the time now is between 10.3 and 10.5 seconds past the minute</li>
+<li>The uncertainty bound can be calculated based on your time source(GPS receiver, atomic clock, uncertainty is based on the expected quartz drift since your last sync with the server, plus the NTP server’s uncertainty, plus the network round-trip time to the server).Unfortunately, most systems don’t expose this uncertainty: for example, when you call clock_gettime(), the return value doesn’t tell you the expected error of the timestamp</li>
+<li>An interesting exception is Google’s TrueTime API in Spanner, which explicitly reports the confidence interval on the local clock. When you ask it for the current time, you get back two values: <code>[earliest, latest]</code>, which are the earliest possible and the latest possible timestamp</li>
+</ul>
+</li>
+<li>
+<h4 id="synchronized-clocks-for-global-snapshots">Synchronized clocks for global snapshots</h4>
+<ul>
+<li>The most common implementation of snapshot isolation requires a monotonically increasing transaction ID</li>
+<li>However, when a database is distributed across many machines, potentially in multiple datacenters, a global, monotonically increasing transaction ID (across all partitions) is difficult to generate</li>
+<li>Can we use the timestamps from synchronized time-of-day clocks as transaction IDs? If we could get the synchronization good enough, they would have the right properties</li>
+<li>Google spanner snapshot isolation implementation:
+<ul>
+<li>if you have two confidence intervals, each consisting of an earliest and latest possible timestamp $(A = [A_{earliest}, A_{latest}] \ and \ B = [B_{earliest}, B_{latest}])$, and those two intervals do not overlap $(i.e., A_{earliest} &lt; A_{latest} &lt; B_{earliest} &lt; B_{latest})$, then B definitely happened after A—there can be no doubt. Only if the intervals overlap are we unsure in which order A and B happened</li>
+<li>In order to ensure that transaction timestamps reflect causality, Spanner deliberately waits for the length of the confidence interval before committing a read-write transaction</li>
+<li>By doing so, it ensures that any transaction that may read the data is at a sufficiently later time, so their confidence intervals do not overlap.</li>
+<li>In order to keep the wait time as short as possible, Spanner needs to keep the clock uncertainty as small as possible</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h3 id="process-pauses">Process Pauses</h3>
+<ul>
+<li>a garbage collector (GC) that occasionally needs to stop all running threads. These “stop-the-world” GC pauses have sometimes been known to last for several minutes</li>
+<li>In virtualized environments, a virtual machine can be suspended (pausing the execution of all processes and saving the contents of memory to disk) and resumed</li>
+<li>On end-user devices such as laptops, execution may also be suspended and resumed arbitrarily</li>
+<li>When the operating system context-switches to another thread, or when the hypervisor switches to a different virtual machine (when running in a virtual machine), the currently running thread can be paused at any arbitrary point in the code.In the case of a virtual machine, the CPU time spent in other virtual machines is known as <em>steal time</em></li>
+<li>If the application performs synchronous disk access, a thread may be paused waiting for a slow disk I/O operation to complete</li>
+<li>If the operating system is configured to allow swapping to disk (paging), a simple memory access may result in a page fault that requires a page from disk to be loaded into memory. The thread is paused while this slow I/O operation takes place.</li>
+<li>All of these occurrences can preempt the running thread at any point and resume it at some later time, without the thread even noticing.</li>
+<li>A node in a distributed system must assume that its execution can be paused for a significant length of time at any point, even in the middle of a function</li>
+<li>Limiting the impact of garbage collection
+<ul>
+<li>An emerging idea is to treat GC pauses like brief planned outages of a node, and to let other nodes handle requests from clients while one node is collecting its garbage</li>
+<li>If the runtime can warn the application that a node soon requires a GC pause, the application can stop sending new requests to that node, wait for it to finish process‐ ing outstanding requests, and then perform the GC while no requests are in progress</li>
+<li>A variant of this idea is to use the garbage collector only for short-lived objects (which are fast to collect) and to restart processes periodically, before they accumulate enough long-lived objects to require a full GC of long-lived objects</li>
+<li>One node can be restarted at a time, and traffic can be shifted away from the node before the planned restart, like in a rolling upgrade</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h2 id="knowledge-truth-and-lies">Knowledge, Truth, and Lies</h2>
+<ul>
+<li>The consequences of these issues(unreliable network with variable delays, and the systems may suffer from partial failures, unreliable clocks, and processing pauses) in distributed systems are profoundly disorienting if you’re not used to distributed systems</li>
+<li>A node can only find out what state another node is in (what data it has stored, whether it is correctly functioning, etc.) by exchanging messages with it</li>
+<li>In a distributed system, we can state the assumptions we are making about the behaviour (the system model) and design the actual system in such a way that it meets those assumptions</li>
+<li>Algorithms can be proved to function correctly within a certain system model.</li>
+<li>This means that reliable behaviour is achievable, even if the underlying system model provides very few guarantees.</li>
+</ul>
+</li>
+<li>
+<h3 id="the-truth-is-defined-by-the-majority">The Truth Is Defined by the Majority</h3>
+<ul>
+<li>network with an <em>asymmetric fault</em>: a node is able to receive all messages sent to it, but any outgoing messages from that node are dropped or delayed
+<ul>
+<li>Even though the node is working, other node cannot hear its response and will declare it dead after some time</li>
+<li>In a slightly better scenario, if the semi disconnected node detects that none of the messages it is sending is getting any response it may and realize that there may be a fault in the network. Nevertheless the node may be declared dead</li>
+<li>In a third scenario there may be long GC pauses that stops sending and receiving request and response. The other nodes wait and retry and finally declare the node dead.</li>
+</ul>
+</li>
+<li>The moral of these stories is that a node cannot necessarily trust its own judgment of a situation</li>
+<li>A distributed system cannot exclusively rely on a single node, because a node may fail at any time, potentially leaving the system stuck and unable to recover</li>
+<li>many distributed algorithms rely on a <em>quorum</em>, that is, voting among the nodes</li>
+<li>If a quorum of nodes declares another node dead, then it must be considered dead, even <em>if that node still very much feels alive</em> Xd</li>
+<li>
+<h4 id="the-leader-and-the-lock">The leader and the lock</h4>
+<ul>
+<li>Frequently, a system requires there to be <em>only one of some thing</em>?
+<ul>
+<li>Only one node is allowed to be the leader for a database partition, to avoid split brain</li>
+<li>Only one transaction or client is allowed to hold the lock for a particular resource or object, to prevent concurrently writing to it and corrupting it</li>
+<li>Only one user is allowed to register a particular username, because a username must uniquely identify a user</li>
+</ul>
+</li>
+<li>if a node believes that it is the chosen one(even though majority of the nodes have declared it dead) and continues to behave like it, it could cause problems</li>
+<li>data corruption bug due to an incorrect implementation of locking
+<ul>
+<li>you want to ensure that a file in a storage service can only be accessed by one client at a time because multiple access can cause the data to be corrupted</li>
+<li>we implement this by requiring a client to obtain a lease from a lock service before accessing the file</li>
+<li>if the client holding the lease is paused for too long, its lease expires. Another client can obtain a lease for the same file, and start writing to the file</li>
+<li>When the paused client comes back, it believes that it still has valid lease and proceeds to write and corrupts the file</li>
+</ul>
+</li>
+<li>
+<h4 id="fencing-tokens">Fencing tokens</h4>
+<ul>
+<li>We need to ensure that node is not under the false belief that it is the chosen one. A simple technique that achieves this goal is called fencing</li>
+<li>every time the lock server grants a lock or lease, it also returns a fencing token, which is a number that increases every time a lock is granted</li>
+<li>We can then require that every time a client sends a write request to the storage service, it must include its current fencing token.</li>
+<li>When a dead client comes back online and sends its write request to the client along with a fencing token, its write will be rejected if a write with a higher token value has already been processed</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h3 id="byzantine-faults">Byzantine Faults</h3>
+<ul>
+<li>Fencing tokens can detect and block a node that is inadvertently acting in error, however if a node acts maliciously and wants to subvert system guarantees it could easily do it by sending fake messages</li>
+<li>The discussion in the book is limited to the assumption that nodes are unreliable but honest</li>
+<li>Distributed systems problems become much harder if there is a risk that nodes may “lie” (send arbitrary faulty or corrupted responses)</li>
+<li>if a node may claim to have received a particular message when in fact it didn’t. Such behaviour is known as a <em>Byzantine fault</em>, and the problem of reaching consensus in this untrusting environment is known as the <em>Byzantine Generals Problem</em></li>
+<li>A system is <em>Byzantine fault-tolerant</em> if it continues to operate correctly even if some of the <em>nodes are malfunctioning and not obeying the protocol</em>, or if <em>malicious attackers</em> are interfering with the network.</li>
+<li>Situations where Byzantine fault may arise
+<ul>
+<li>In aerospace environments, the data in a computer’s memory or CPU register could become corrupted by radiation leading it to respond to other nodes in arbitrarily unpredictable ways</li>
+<li>In a system with multiple participating organizations, some participants may attempt to cheat or defraud others. In such circumstances, it is not safe for a node to simply trust another node’s messages. e.g. Bitcoin</li>
+</ul>
+</li>
+<li>The discussion here is limited to non byzantine fault tolerant systems</li>
+<li>A bug in the software could be regarded as a Byzantine fault, but if you deploy the same software to all nodes, then a Byzantine fault-tolerant algorithm cannot save you</li>
+<li>To use this approach against bugs, you would have to have four independent implementations of the same software and hope that a bug only appears in one of the four implementations</li>
+</ul>
+</li>
+<li>
+<h3 id="system-model-and-reality">System Model and Reality</h3>
+<ul>
+<li>Algorithms need to be written in a way that does not depend too heavily on the details of the hardware and software configuration on which they are run</li>
+<li>This in turn requires that we somehow formalize the kinds of faults that we expect to happen in a system</li>
+<li>We do this by defining a <em>system model</em>, which is an abstraction that describes what <em>things an algorithm may assume</em>
+<ul>
+<li>System models wrt <em>timing</em> assumptions
+<ul>
+<li><em>Synchronous model:</em> The synchronous model assumes bounded network delay, bounded process pauses,and bounded clock error. Not a realistic model for most practical systems</li>
+<li><em>Partially synchronous model:</em> Partial synchrony means that a system behaves like a synchronous system most of the time, but it sometimes exceeds the bounds for network delay, process pauses, and clock drift. This is a realistic model of many systems: most of the time, networks and processes are quite well behaved</li>
+<li><em>Asynchronous model:</em> an algorithm is not allowed to make any timing assumptions—in fact, it does not even have a clock (so it cannot use timeouts)</li>
+</ul>
+</li>
+<li>system model wrt node failure assumptions
+<ul>
+<li><em>Crash-stop faults:</em> Node can stop in only one way i.e. crashing and never come back</li>
+<li><em>Crash-recovery faults:</em> We assume that nodes may crash at any moment, and perhaps start responding again after some unknown time. In this failure model nodes are assumed to have stable storage.</li>
+<li><em>Byzantine (arbitrary) faults:</em> Nodes may do absolutely anything</li>
+</ul>
+</li>
+<li>For modeling real systems, the partially synchronous model with crash-recovery faults is generally the most useful model.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h3 id="correctness-of-an-algorithm">Correctness of an algorithm</h3>
+<ul>
+<li>what is means for an algorithm to be correct?</li>
+<li>we can write down the properties we want of a distributed algorithm to define what it means to be correct</li>
+<li>
+<h4 id="safety-and-liveness">Safety and liveness</h4>
+<ul>
+<li>safety
+<ul>
+<li>Safety is often informally defined as <em>nothing bad happens</em></li>
+<li>If a safety property is violated, we can point at a particular point in time at which it was broken</li>
+<li>After a safety property has been violated, the violation cannot be undone the damage is already done</li>
+<li>For distributed algorithms, it is common to require that safety properties always hold, in all possible situations of a system model</li>
+</ul>
+</li>
+<li>liveness
+<ul>
+<li>it is defined as <em>something good eventually happens</em></li>
+<li>liveness properties often include the word “eventually” in their definition</li>
+<li>it may not hold at some point in time, but there is always hope that it may be satisfied in the future</li>
+<li>with liveness properties we are allowed to make caveats: for example, we could say that a request needs to receive a response only if a majority of nodes have not crashed</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<h4 id="mapping-system-models-to-the-real-world">Mapping system models to the real world</h4>
+<ul>
+<li>When implementing distributed systems messy reality of real world come out. It becomes clear that system model is a simplified abstraction of reality</li>
+<li>Quorum algorithms rely on node remembering the data, that it claims to have stored. If a node may suffer from amnesia and forget previously stored data, that breaks the quorum condition</li>
+<li>what happens when assumption gets broken -&gt; correctness of algorithm gets broken</li>
+<li>Perhaps a new system model? assumption being, storage nodes mostly survive crashes, but sometimes may be lost, This makes reasoning harder</li>
+<li>The theoretical description of an algorithm can declare certain things correct under certain assumptions, but in real world those assumptions can break and needs to be handled.</li>
+<li>This doesn&rsquo;t make theoretical models useless, quite the opposite, They are incredibly helpful for distilling down the complexity of real systems to a manageable set of faults that we can reason about</li>
+<li>We can prove algorithms correct by showing that their properties always hold in some system model.</li>
+<li><em>Proving an algorithm correct does not mean its implementation on a real system will necessarily always behave correctly</em></li>
+<li>But it’s a very good first step, because the theoretical analysis can uncover problems in an algorithm that might remain hidden for a long time in a real system, and that only come to bite you when your assumptions (e.g., about timing) are defeated due to unusual circumstances</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+</article>
+
+            </div>
+        </main>
+    </body></html>
