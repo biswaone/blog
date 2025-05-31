@@ -1,4 +1,4 @@
-baseURL = 'https://example.org/'
+baseURL = 'https://biswaone.github.io/'
 languageCode = 'en-us'
 title = 'Notes/Rambling of a 0x engineer'
 theme = 'hugo-theme-nostyleplease'
