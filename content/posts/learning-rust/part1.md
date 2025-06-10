@@ -54,9 +54,11 @@ func main() {
 	fmt.Printf("Value: %d\n", *ref) // Prints: Value: 30
 }
 ```
-This Go program compiles and runs, correctly printing 30. How? The Go compiler performs escape analysis. It detects that a reference to arr "escapes" the function's scope. To prevent a memory bug, it automatically allocates arr on the heap instead of the stack.
+This Go program compiles and runs, correctly printing 30. How? The Go compiler performs what's known as **escape analysis**.
 
-You can see this happening if you build with the {{< highlight bash "hl_inline=true" >}}go build -gcflags="-m" escapeAnalysis.go{{< /highlight >}} I see the below getting logged to the command line.
+Escape analysis is a compile-time process where the compiler determines if a variable's memory address "escapes" the function it was created in. If a variable is only used within its function, it can be safely allocated on the stack, which is very fast. However, if a reference to the variable is returned or shared in a way that it could be used after the function finishes (like in our example), it's said to "escape." To ensure memory safety, the compiler moves the escaped variable to the heap. This prevents a dangling pointer but can introduce the hidden performance cost of heap allocation and garbage collection.
+
+In our Go code, the compiler detects that a reference to arr "escapes" the getElementRef function's scope. To prevent a memory bug, it automatically allocates arr on the heap instead of the stack. You can see this happening if you build with the {{< highlight bash "hl_inline=true" >}}go build -gcflags="-m" escapeAnalysis.go{{< /highlight >}} command, which logs the following:
 
 ``` bash
 # command-line-arguments
@@ -148,4 +150,4 @@ By passing &s1, we are lending calculate_length temporary, read-only access to t
 
 Our small experiment of returning a reference from a function highlights a big difference in how programming languages think about safety. C++ gives full control but can lead to unsafe bugs (These bugs have been long present in c/c++ code bases and tools have been developed to identify memory safety issues but they can't guarantee 100% memory safety whereas in rust memory safety is baked in as part of the language design itself). Go adds safety with a garbage collector, but it's mostly hidden. Rust offers a middle ground: **memory safety checked at compile time**.
 
-With Rust’s ownership and borrowing rules, the compiler catches mistakes before they happen. In the next blog, will discuss how to program with rust ownership and borrowing rules, lifetimes, mutable references and more. Thanks for reading. 
+In the next blog, will discuss how to program with rust ownership and borrowing rules, lifetimes, mutable references and more. Thanks for reading. 
