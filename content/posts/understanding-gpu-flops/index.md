@@ -63,7 +63,7 @@ The above image is of a streaming multiprocessor (SM) from Nvidia's A100 GPU. Th
 
 What does does these numbers INT32, FP32 and FP64 mean. Generally, these are data types used to store and process numbers. INT32 means 32 bit integer. Similarly FP32 means 32 bit floating point number. We allocate these many bits to represent a number.
 
-Each of these cores are responsible for doing FMA operations on the data types they represent. A single FP32 core will has a FMA unit built into it. Every clock cycle, it can take 2 numbers $a$ and $b$ and add one $c$. The output $a * b + c$ . We are doing 1 FMA/clock on each core and each FMA has 2 float point operations (FLOPS) (1 addition and 1 multiplication), in total we have 2 FLOPS/clock per core.
+Each of these cores are responsible for doing FMA operations on the data types they represent. A single FP32 core will have a FMA unit built into it. Every clock cycle, it can take 2 numbers $a$ and $b$ and add one $c$. The output $a * b + c$ . We are doing 1 FMA/clock on each core and each FMA has 2 float point operations (FLOPS) (1 addition and 1 multiplication), in total we have 2 FLOPS/clock per core.
 
 For, FP32, 64 cores are present per SM, total 108 SM in a A100 GPU, 108 SMs × 64 cores/SM = 6,912 cores.
 
