@@ -2,6 +2,8 @@
 title = 'Understanding GPU FLOPs Through a Matrix Multiplication'
 date = 2026-08-16T17:20:00+05:30
 math = true
+# Shown when someone shares a link to this post. It does not appear on the page.
+images = ["cover-a100-full-gpu.png"]
 +++
 
 Every Nvidia GPU release comes with numbers like "19.5TFLOPS FP32" or "312 TFLOPS Tensor". What do these mean? Where do they come from. The answer is not complicated and can be found by simple mathematics. I walk you through a simple example of matrix multiplication to derive these numbers for modern GPUs like A100 or H100.
