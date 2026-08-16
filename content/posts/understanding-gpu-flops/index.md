@@ -53,6 +53,8 @@ In a modern Nvidia gpu like A100 or H100 there are several cores that can do the
 
 ![Streaming multiprocessor of an Nvidia A100 GPU](a100-streaming-multiprocessor.png)
 
+*Source: [NVIDIA Ampere Architecture whitepaper](https://images.nvidia.com/aem-dam/en-zz/Solutions/data-center/nvidia-ampere-architecture-whitepaper.pdf)*
+
 The above image is of a streaming multiprocessor (SM) from Nvidia's A100 GPU. They are roughly analogous to cores of CPUs. The A100 GPU has 108 SM. The tiles in green are the compute cores inside the SM. There are different types of cores responsible for doing the FMA operations. In the above image we can see there are 4 different types of green tiles. INT32, FP32, FP64 and Tensor core.
 
 What does does these numbers INT32, FP32 and FP64 mean. Generally, these are data types used to store and process numbers. INT32 means 32 bit integer. Similarly FP32 means 32 bit floating point number. We allocate these many bits to represent a number.
@@ -83,5 +85,7 @@ $$\underbrace{432}_{\text{Tensor Cores}} \times \underbrace{512}_{\text{FLOPs/cl
 Here is the official figures for these estimated numbers
 
 ![Official A100 specifications](a100-official-specifications.png)
+
+*Source: [NVIDIA Ampere Architecture whitepaper](https://images.nvidia.com/aem-dam/en-zz/Solutions/data-center/nvidia-ampere-architecture-whitepaper.pdf)*
 
 As an exercise you can calculate these values for other core types.
