@@ -1,7 +1,7 @@
 +++
 title = 'CSE138: Notes'
 date = 2023-10-03T13:57:56+05:30 
-mathjax = true
+math = true
 +++
 - ### [CSE138 (Distributed Systems) L3: partial orders, total orders, Lamport clocks, vector clocks](https://www.youtube.com/watch?v=UqY1tF3zxjc&list=PLNPUF5QyWU8PydLG2cIJrCvnn5I_exhYx&index=3)
 	- **Happens Before:** 

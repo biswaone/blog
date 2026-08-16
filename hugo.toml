@@ -1,12 +1,128 @@
 baseURL = 'https://biswaone.github.io/'
-languageCode = 'en-us'
+locale = 'en-us'
 title = 'Notes/Rambling of a 0x engineer'
-theme = 'hugo-theme-nostyleplease'
+theme = 'hugo-texify3'
+
+enableRobotsTXT = true
+enableGitInfo = true
+rssLimit = 10
+
+[pagination]
+  pagerSize = 10
+
+[taxonomies]
+  tags = "tags"
+  categories = "categories"
+
+# The theme ships its own markup defaults. These are repeated here so the site
+# does not depend on theme config merge order.
+[markup]
+  [markup.goldmark.renderer]
+    unsafe = true
+
+  # KaTeX needs the raw delimiters. Goldmark passthrough keeps them intact.
+  [markup.goldmark.extensions.passthrough]
+    enable = true
+    [markup.goldmark.extensions.passthrough.delimiters]
+      block = [['$$', '$$'], ['\[', '\]']]
+      inline = [['$', '$'], ['\(', '\)']]
+
+  [markup.highlight]
+    noClasses = false
+
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 6
+    ordered = false
+
+# The theme config declares a menu that points at the theme repository.
+# These entries use the same identifiers, so they replace the theme entries.
+[[menu.main]]
+  identifier = "posts"
+  name = "Blog"
+  url = "/posts/"
+  weight = 1
+  pre = """
+<svg width="1em" height="1em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+<path d="M17,11H16a1,1,0,0,0,0,2h1a1,1,0,0,0,0-2Zm0,4H16a1,1,0,0,0,0,2h1a1,1,0,0,0,0-2ZM11,9h6a1,1,0,0,0,0-2H11a1,1,0,0,0,0,2ZM21,3H7A1,1,0,0,0,6,4V7H3A1,1,0,0,0,2,8V18a3,3,0,0,0,3,3H18a4,4,0,0,0,4-4V4A1,1,0,0,0,21,3ZM6,18a1,1,0,0,1-2,0V9H6Zm14-1a2,2,0,0,1-2,2H7.82A3,3,0,0,0,8,18V5H20Zm-9-4h1a1,1,0,0,0,0-2H11a1,1,0,0,0,0,2Zm0,4h1a1,1,0,0,0,0-2H11a1,1,0,0,0,0,2Z"/></svg>
+"""
+
+[[menu.main]]
+  identifier = "rss"
+  name = "RSS"
+  url = "/index.xml"
+  weight = 2
+  pre = """
+<svg width="1em" height="1em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+<path d="M2.88,16.88a3,3,0,0,0,0,4.24,3,3,0,0,0,4.24,0,3,3,0,0,0-4.24-4.24Zm2.83,2.83a1,1,0,0,1-1.42-1.42,1,1,0,0,1,1.42,0A1,1,0,0,1,5.71,19.71ZM5,12a1,1,0,0,0,0,2,5,5,0,0,1,5,5,1,1,0,0,0,2,0,7,7,0,0,0-7-7ZM5,8a1,1,0,0,0,0,2,9,9,0,0,1,9,9,1,1,0,0,0,2,0,11.08,11.08,0,0,0-3.22-7.78A11.08,11.08,0,0,0,5,8Zm10.61.39A15.11,15.11,0,0,0,5,4,1,1,0,0,0,5,6,13,13,0,0,1,18,19a1,1,0,0,0,2,0A15.11,15.11,0,0,0,15.61,8.39Z"/></svg>
+"""
+
+[[menu.main]]
+  identifier = "github"
+  name = "GitHub"
+  url = "https://github.com/biswaone"
+  weight = 3
+  pre = """
+<svg width="1em" height="1em" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+<path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .268.18.58.688.482A10.019 10.019 0 0 0 22 12.017C22 6.484 17.522 2 12 2Z"/></svg>
+"""
 
 [params]
-  math = true
+  title = 'Notes/Rambling of a 0x engineer'
+  author = 'Biswa Prakash Mishra'
+  description = 'Notes and rambling of a 0x engineer. Distributed systems, databases, and whatever else I am reading.'
+  keywords = ["blog", "distributed systems", "databases", "notes", "rust", "go"]
 
-[markup]
-  [markup.goldmark]
-    [markup.goldmark.renderer]
-      unsafe = true
+  dateFormat = "2 January 2006"
+  rootFontSize = "100%"
+  since = "2022"
+
+  toc = true
+  math = true
+  showWordCount = true
+  showReadingTime = true
+  enableInlineShortcodes = true
+
+  # Auto-numbering counts from the first h2. These posts use h3 and h4 inside
+  # bullet lists, so the numbers start at "0.1". Off until the headings change.
+  numberedSubtitles = false
+
+  # Adds dots above bold Chinese text. This blog is English only.
+  emphasisWithDots = false
+
+  # Sends the search query to DuckDuckGo. Off by choice.
+  enableDuckDuckGoSearchBox = false
+
+  customCSS = []
+  customJS = []
+
+  footnote = """
+Powered by <a class=link href=https://gohugo.io target=_blank rel=noopener>Hugo</a> |
+Theme <a class=link href=https://github.com/michaelneuper/hugo-texify3 target=_blank rel=noopener>TeXify3</a>
+"""
+
+  # The theme config supplies the theme author's giscus snippet. This empty
+  # value replaces it. Put your own giscus or Disqus snippet here to add comments.
+  [params.commentEngine]
+    code = ""
+
+  # The theme config supplies the theme author's Buy Me A Coffee widget.
+  # This empty value replaces it.
+  [params.buymeacoffee]
+    code = ""
+
+  [params.sharingbuttons]
+    facebook = false
+    twitter = false
+    email = false
+    linkedin = false
+    reddit = false
+    whatsapp = false
+    hackernews = false
+    telegram = false
+
+# The theme config supplies the theme author's Google Analytics ID for the
+# production environment. This empty value replaces it.
+[services]
+  [services.googleAnalytics]
+    ID = ""

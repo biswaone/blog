@@ -1,7 +1,7 @@
 +++
 title = 'Trouble with distributed systems'
 date = 2022-05-22T13:57:56+05:30 
-mathjax = true
+math = true
 +++
 
 - *anything that can go wrong will go wrong* 

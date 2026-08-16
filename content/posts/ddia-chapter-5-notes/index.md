@@ -1,7 +1,7 @@
 +++
 title = 'Replication'
 date = 2023-10-03T13:57:56+05:30
-mathjax = true
+math = true
 +++
 
 - Replication: Keeping a copy of same data

@@ -1,7 +1,7 @@
 +++
 title = 'Reliable, Scalable, and Maintainable Applications'
 date = 2022-05-22T13:57:56+05:30 
-mathjax = true
+math = true
 +++
 
 1. Standard building blocks of data intensive applications
