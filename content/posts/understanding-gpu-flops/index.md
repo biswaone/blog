@@ -67,9 +67,11 @@ Each of these cores is responsible for doing FMA operations on the data types th
 
 For FP32, 64 cores are present per SM, and with a total of 108 SMs in an A100 GPU, 108 SMs × 64 cores/SM = 6,912 cores.
 
+Now let's calculate how many FLOPS all the FP32 cores can do.
+
 $$\underbrace{6{,}912}_{\text{cores}} \times \underbrace{2}_{\text{FLOPs/clock/core}} \times \underbrace{1.41\times10^{9}}_{\text{clocks/sec}} = 19.49\times10^{12}\ \text{FLOPs/sec} \approx 19.5\ \text{TFLOPS}$$
 
-That is 19.5 Tera-FLOPS per second.
+All the FP32 cores in an A100 can do 19.5 Tera-FLOPS per second. 
 
 But what about tensor cores? How are they different from our usual FP32 cores?
 
