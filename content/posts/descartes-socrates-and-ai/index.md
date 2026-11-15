@@ -14,7 +14,7 @@ He treated doubting as a form of thinking. Doubting or challenging one’s belie
 
 But what unshakable truth are we trying to find? In knowledge work, over time we build mental models of the things we work with. These mental models are built on assumptions of different kinds. We grow comfortable with those assumptions without questioning them.
 
-Descartes offers a way to shake those assumptions loose. Descartes took doubt to the extreme. He questioned everything, even simple maths, until he found the one thing he could not doubt: that he himself existed. This degree of skepticism is uncalled for in most practical work. We don’t need to go that far, but his idea of questioning what we take for granted is worth keeping. It exposes how weak our mental models are and gives us a way to improve them.
+Descartes offers a way to shake those assumptions loose. He took doubt to the extreme, questioned everything, even simple maths, until he found the one thing he could not doubt: that he himself existed. This degree of skepticism is uncalled for in most practical work. We don’t need to go that far, but his idea of questioning what we take for granted is worth keeping. It exposes how weak our mental models are and gives us a way to improve them.
 
 Questioning is the most important instrument of methodological skepticism. Centuries before Descartes, Socrates asked questions to explore a topic or person. He kept questioning until he reached a conclusion or the reasoning fell apart. We call this the Socratic method, or Socratic debate.
 
