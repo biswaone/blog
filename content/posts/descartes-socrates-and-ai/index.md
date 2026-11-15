@@ -5,7 +5,7 @@ date = 2026-11-15T12:00:00+05:30
 images = ["cover-descartes-socrates-ai.webp"]
 +++
 
-![Descartes and Socrates debate across a table while an AI judge sits between them](cover-descartes-socrates-ai.webp)
+![Descartes and Socrates debate while a robot judge stands between them](cover-descartes-socrates-ai.webp)
 
 René Descartes famously wrote ‘cogito, ergo sum,’ which means ‘I think, therefore I am.’ In another of his works he put it a little differently: ‘I doubt, therefore I am, or what is the same, I think, therefore I am.’
 
