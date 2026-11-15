@@ -1,4 +1,7 @@
-baseURL = 'https://biswaone.github.io/'
+# GitHub Pages serves this repo as a project site under /blog/. The root
+# domain belongs to the biswaone.github.io repo. The deploy workflow also
+# passes this value with --baseURL, so local builds and the live site match.
+baseURL = 'https://biswaone.github.io/blog/'
 locale = 'en-us'
 title = 'Notes/Rambling of a 0x engineer'
 theme = 'hugo-texify3'
