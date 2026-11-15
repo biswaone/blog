@@ -2,7 +2,8 @@
 title = 'Descartes, Socrates and AI'
 date = 2026-11-15T12:00:00+05:30
 # Shown when someone shares a link to this post. It does not appear on the page.
-images = ["cover-descartes-socrates-ai.webp"]
+# A JPEG copy, because some sites do not show WebP images in link previews.
+images = ["cover-descartes-socrates-ai.jpg"]
 +++
 
 ![Descartes and Socrates debate while a robot judge stands between them](cover-descartes-socrates-ai.webp)
